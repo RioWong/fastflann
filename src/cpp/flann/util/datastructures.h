@@ -39,18 +39,30 @@ class balancedTree
 public:
 
 	/**
-	* 
+		Every node stores a value. When the node stores a value which is different from NAN
+		occupied becomes true
 	*/
 	T value;
 	bool occupied;
 
+	/**
+		Depth is the maximal depth that a child from this node has
+	*/
 	int depth;
 
+	/**
+		Every node has a pointer to each child and a pointer to the parent
+	*/
 	balancedTree* parent;
-
 	balancedTree<T>* nodel;
 	balancedTree<T>* noder;
 
+
+	/**
+		Constructor
+		
+		@param pointer to the parent of this node
+	*/
 	balancedTree(balancedTree<T>* parent_) 
 	{
 		value = NAN;
@@ -64,12 +76,21 @@ public:
 		noder = NULL;
 	}
 
+	/**
+		Deconstructor
+	*/
 	~balancedTree(void) 
 	{
 		if (nodel) { nodel->~balancedTree();}
 		if (noder) { noder->~balancedTree();}
 	}
 
+	/**
+		Adds a value to the tree
+
+		@param node_ the value which should be added
+		@return true when operation was successful
+	*/
 	bool addNode(T node_)
 	{
 		int success = 0;
@@ -87,6 +108,7 @@ public:
 			
 			success = nodel->addNode(node_);
 
+			// Computation of the depth
 			if (noder) {
 				depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
 			}
@@ -102,6 +124,7 @@ public:
 			
 			success = noder->addNode(node_);
 
+			// Computation of the depth
 			if (nodel) {
 				depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
 			}
@@ -115,6 +138,7 @@ public:
 		}
 
 		if (success) {
+			// Computation whether the tree is balanced after adding the value
 			int balancefactor = 0;
 			if (!nodel && noder) {
 				balancefactor = -noder->depth - 1;
@@ -126,18 +150,24 @@ public:
 				balancefactor = nodel->depth - noder->depth;
 			}
 
-			change(balancefactor);
+			//Balancing the tree
+			balance(balancefactor);
 		}
 
 		return success;
 	}
 
-	void change(int balancefactor_)
+	/**
+		Adds a value to the tree
+
+		@param balancefactor this factor determines whether the tree should be balanced
+	*/
+	void balance(int balancefactor_)
 	{
 		if (balancefactor_ == 2) {
 			
 			if (nodel->noder) {
-				nodel->change(-2);
+				nodel->balance(-2);
 			}
 			
 			if (parent) {
@@ -159,7 +189,7 @@ public:
 		else if (balancefactor_ == -2) {
 
 			if (noder->nodel) {
-				noder->change(2);
+				noder->balance(2);
 			}
 
 			if (parent) {
@@ -180,14 +210,9 @@ public:
 		}
 	}
 
-	void getNodes()
-	{
-		std::cout << value << " ";
-
-		if (nodel) { nodel->getNodes(); }
-		if (noder) { noder->getNodes(); }
-	}
-
+	/**
+		Displays some information about ervery node of the tree
+	*/
 	void getInfos()
 	{
 		if (nodel) { nodel->getInfos(); }
@@ -207,6 +232,9 @@ public:
 		}
 	}
 
+	/**
+		Computes and sets the depth of every node and
+	*/
 	void setDepth()
 	{
 		if (nodel) { nodel->setDepth(); }
@@ -225,7 +253,13 @@ public:
 			depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
 		}
 	}
+	
+	/**
+		Searches for a node with the same value as value_
 
+		@param value_ value which should be searched for in the tree
+		@return true when the tree contains a node with the given value
+	*/
 	bool search(size_t value_)
 	{
 		if (value_ == value) { return 1; }
