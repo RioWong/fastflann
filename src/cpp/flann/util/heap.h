@@ -57,7 +57,7 @@ class Heap
 
     /**
      * Number of element in the heap
-     */
+	 */public:
     int count;
 
 
@@ -113,6 +113,17 @@ public:
         }
     };
 
+	/**
+	* Resizes the heap
+	*/
+
+	void resize()
+	{
+		heap.reserve(length * 2);
+		length = length * 2;
+	}
+
+
     /**
      * Insert a new element in the heap.
      *
@@ -126,7 +137,7 @@ public:
     {
         /* If heap is full, then return without adding this element. */
         if (count == length) {
-            return;
+			resize();
         }
 
         heap.push_back(value);

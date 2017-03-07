@@ -53,6 +53,8 @@
 #include "flann/util/saving.h"
 #include "flann/util/serialization.h"
 
+#include "flann/util/datastructures.h"
+
 namespace flann
 {
 
@@ -548,23 +550,98 @@ private:
         int maxChecks = searchParams.checks;
 
         // Priority queue storing intermediate branches in the best-bin-first search
-        Heap<BranchSt>* heap = new Heap<BranchSt>(size_);
+		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
+		if (heapSize > std::pow(2, std::log((double)size_) / std::log((double)2))) {
+			heapSize = std::pow(2, std::log((double)size_) / std::log((double)2));
+		}
+		Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize); //Heap<BranchSt>* heap = new Heap<BranchSt>(size_);
+		
+		if (result.capacity_ < size_ / 2) {
+			balancedTree<int>* checked(new balancedTree<int>(NULL));
 
-        DynamicBitset checked(size_);
-        int checks = 0;
-        for (int i=0; i<trees_; ++i) {
-            findNN<with_removed>(tree_roots_[i], result, vec, checks, maxChecks, heap, checked);
-        }
+			int checks = 0;
+			for (int i = 0; i < trees_; ++i) {
+				findNN<with_removed>(tree_roots_[i], result, vec, checks, maxChecks, heap, checked);
+			}
 
-        BranchSt branch;
-        while (heap->popMin(branch) && (checks<maxChecks || !result.full())) {
-            NodePtr node = branch.node;
-            findNN<with_removed>(node, result, vec, checks, maxChecks, heap, checked);
-        }
+			BranchSt branch;
+			while (heap->popMin(branch) && (checks < maxChecks || !result.full())) {
+				NodePtr node = branch.node;
+				findNN<with_removed>(node, result, vec, checks, maxChecks, heap, checked);
+			}
 
+			checked->~balancedTree();
+		}
+		else {
+			DynamicBitset checked(size_);
+
+			int checks = 0;
+			for (int i = 0; i < trees_; ++i) {
+				findNN<with_removed>(tree_roots_[i], result, vec, checks, maxChecks, heap, checked);
+			}
+
+			BranchSt branch;
+			while (heap->popMin(branch) && (checks < maxChecks || !result.full())) {
+				NodePtr node = branch.node;
+				findNN<with_removed>(node, result, vec, checks, maxChecks, heap, checked);
+			}
+
+		}
         delete heap;
     }
 
+	/**
+	* Performs one descent in the hierarchical k-means tree. The branches not
+	* visited are stored in a priority queue.
+	*
+	* Params:
+	*      node = node to explore
+	*      result = container for the k-nearest neighbors found
+	*      vec = query points
+	*      checks = how many points in the dataset have been checked so far
+	*      maxChecks = maximum dataset points to checks
+	*/
+
+	template<bool with_removed>
+	void findNN(NodePtr node, ResultSet<DistanceType>& result, const ElementType* vec, int& checks, int maxChecks,
+		Heap<BranchSt>* heap, balancedTree<int>* checked) const
+	{
+		if (node->childs.empty()) {
+			if (checks >= maxChecks) {
+				if (result.full()) return;
+			}
+
+			for (size_t i = 0; i<node->points.size(); ++i) {
+				PointInfo& pointInfo = node->points[i];
+				if (with_removed) {
+					if (removed_points_.test(pointInfo.index)) continue;
+				}
+				if (checked->search(pointInfo.index)) continue;
+				DistanceType dist = distance_(pointInfo.point, vec, veclen_);
+				result.addPoint(dist, pointInfo.index);
+				checked->addNode(pointInfo.index);
+				++checks;
+			}
+		}
+		else {
+			DistanceType* domain_distances = new DistanceType[branching_];
+			int best_index = 0;
+			domain_distances[best_index] = distance_(vec, node->childs[best_index]->pivot, veclen_);
+			for (int i = 1; i<branching_; ++i) {
+				domain_distances[i] = distance_(vec, node->childs[i]->pivot, veclen_);
+				if (domain_distances[i]<domain_distances[best_index]) {
+					best_index = i;
+				}
+			}
+			for (int i = 0; i<branching_; ++i) {
+				if (i != best_index) {
+					heap->insert(BranchSt(node->childs[i], domain_distances[i]));
+				}
+			}
+			delete[] domain_distances;
+			findNN<with_removed>(node->childs[best_index], result, vec, checks, maxChecks, heap, checked);
+		}
+	}
 
     /**
      * Performs one descent in the hierarchical k-means tree. The branches not

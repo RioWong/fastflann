@@ -724,7 +724,11 @@ private:
         }
         else {
             // Priority queue storing intermediate branches in the best-bin-first search
-            Heap<BranchSt>* heap = new Heap<BranchSt>((int)size_);
+			int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
+			if (heapSize > std::pow(2, std::log((double) size_) / std::log((double)2))) {
+				heapSize = std::pow(2, std::log((double) size_) / std::log((double)2));
+			}
+			Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize);
 
             int checks = 0;
             findNN<with_removed>(root_, result, vec, checks, maxChecks, heap);

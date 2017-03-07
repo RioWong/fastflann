@@ -48,6 +48,8 @@
 #include "flann/util/random.h"
 #include "flann/util/saving.h"
 
+#include "flann/util/datastructures.h"
+
 
 namespace flann
 {
@@ -546,22 +548,96 @@ private:
         BranchSt branch;
 
         int checkCount = 0;
-        Heap<BranchSt>* heap = new Heap<BranchSt>((int)size_);
-        DynamicBitset checked(size_);
+		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
+		if (heapSize > std::pow(2, std::log((double)size_) / std::log((double)2))) {
+			heapSize = std::pow(2, std::log((double)size_) / std::log((double)2));
+		}
+		Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize); //Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize);
+		if(result.capacity_ < size_/2) {
+			balancedTree<int>* checked(new balancedTree<int>(NULL)); 
 
-        /* Search once through each tree down to root. */
-        for (i = 0; i < trees_; ++i) {
-            searchLevel<with_removed>(result, vec, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
-        }
+			/* Search once through each tree down to root. */
+			for (i = 0; i < trees_; ++i) {
+				searchLevel<with_removed>(result, vec, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
+			}
 
-        /* Keep searching other branches from heap until finished. */
-        while ( heap->popMin(branch) && (checkCount < maxCheck || !result.full() )) {
-            searchLevel<with_removed>(result, vec, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
-        }
+			/* Keep searching other branches from heap until finished. */
+			while (heap->popMin(branch) && (checkCount < maxCheck || !result.full())) {
+				searchLevel<with_removed>(result, vec, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
+			}
 
+			checked->~balancedTree();
+		}
+		else {
+			DynamicBitset checked(size_);
+
+			/* Search once through each tree down to root. */
+			for (i = 0; i < trees_; ++i) {
+				searchLevel<with_removed>(result, vec, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
+			}
+
+			/* Keep searching other branches from heap until finished. */
+			while (heap->popMin(branch) && (checkCount < maxCheck || !result.full())) {
+				searchLevel<with_removed>(result, vec, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
+			}
+
+		}
         delete heap;
-
     }
+
+	/**
+	*  Search starting from a given node of the tree.  Based on any mismatches at
+	*  higher levels, all exemplars below this level must have a distance of
+	*  at least "mindistsq".
+	*/
+	template<bool with_removed>
+	void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
+		float epsError, Heap<BranchSt>* heap, balancedTree<int>* checked) const
+	{
+		if (result_set.worstDist()<mindist) {
+			//			printf("Ignoring branch, too far\n");
+			return;
+		}
+
+		/* If this is a leaf node, then do check and return. */
+		if ((node->child1 == NULL) && (node->child2 == NULL)) {
+			int index = node->divfeat;
+			if (with_removed) {
+				if (removed_points_.test(index)) return;
+			}
+			/*  Do not check same node more than once when searching multiple trees. */
+			if (checked->search(index) || ((checkCount >= maxCheck) && result_set.full())) return;
+			checked->addNode(index);
+			checkCount++;
+
+			DistanceType dist = distance_(node->point, vec, veclen_);
+			result_set.addPoint(dist, index);
+			return;
+		}
+
+		/* Which child branch should be taken first? */
+		ElementType val = vec[node->divfeat];
+		DistanceType diff = val - node->divval;
+		NodePtr bestChild = (diff < 0) ? node->child1 : node->child2;
+		NodePtr otherChild = (diff < 0) ? node->child2 : node->child1;
+
+		/* Create a branch record for the branch not taken.  Add distance
+		of this feature boundary (we don't attempt to correct for any
+		use of this feature in a parent node, which is unlikely to
+		happen and would have only a small effect).  Don't bother
+		adding more branches to heap after halfway point, as cost of
+		adding exceeds their value.
+		*/
+
+		DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
+		//		if (2 * checkCount < maxCheck  ||  !result.full()) {
+		if ((new_distsq*epsError < result_set.worstDist()) || !result_set.full()) {
+			heap->insert(BranchSt(otherChild, new_distsq));
+		}
+
+		/* Call recursively to search next level down. */
+		searchLevel<with_removed>(result_set, vec, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
+	}
 
     /**
      *  Search starting from a given node of the tree.  Based on any mismatches at

@@ -82,6 +82,9 @@ template <typename DistanceType>
 class ResultSet
 {
 public:
+
+	ResultSet(size_t capacity_) : capacity_(capacity_) {}
+
     virtual ~ResultSet() {}
 
     virtual bool full() const = 0;
@@ -90,6 +93,7 @@ public:
 
     virtual DistanceType worstDist() const = 0;
 
+	size_t capacity_;
 };
 
 /**
@@ -103,8 +107,8 @@ class KNNSimpleResultSet : public ResultSet<DistanceType>
 public:
 	typedef DistanceIndex<DistanceType> DistIndex;
 
-	KNNSimpleResultSet(size_t capacity_) :
-        capacity_(capacity_)
+	KNNSimpleResultSet(size_t capacity_) : ResultSet(capacity_)
+    
     {
 		// reserving capacity to prevent memory re-allocations
 		dist_index_.resize(capacity_, DistIndex(std::numeric_limits<DistanceType>::max(),-1));
@@ -192,7 +196,6 @@ public:
     }
 
 private:
-    size_t capacity_;
     size_t count_;
     DistanceType worst_distance_;
     std::vector<DistIndex> dist_index_;
@@ -207,7 +210,8 @@ class KNNResultSet : public ResultSet<DistanceType>
 public:
 	typedef DistanceIndex<DistanceType> DistIndex;
 
-    KNNResultSet(int capacity) : capacity_(capacity)
+    KNNResultSet(size_t capacity_) : ResultSet(capacity_)
+
     {
 		// reserving capacity to prevent memory re-allocations
 		dist_index_.resize(capacity_, DistIndex(std::numeric_limits<DistanceType>::max(),-1));
@@ -291,7 +295,6 @@ public:
     }
 
 private:
-    size_t capacity_;
     size_t count_;
     DistanceType worst_distance_;
     std::vector<DistIndex> dist_index_;
@@ -306,8 +309,8 @@ class KNNResultSet2 : public ResultSet<DistanceType>
 public:
 	typedef DistanceIndex<DistanceType> DistIndex;
 
-	KNNResultSet2(size_t capacity_) :
-        capacity_(capacity_)
+	KNNResultSet2(size_t capacity_) : ResultSet(capacity_)
+
     {
 		// reserving capacity to prevent memory re-allocations
 		dist_index_.reserve(capacity_);
@@ -411,7 +414,6 @@ public:
     }
 
 private:
-    size_t capacity_;
     DistanceType worst_dist_;
     std::vector<DistIndex> dist_index_;
     bool is_full_;
@@ -429,7 +431,7 @@ public:
 	typedef DistanceIndex<DistanceType> DistIndex;
 
 	RadiusResultSet(DistanceType radius_) :
-        radius_(radius_)
+        radius_(radius_), ResultSet(0)
     {
 		// reserving some memory to limit number of re-allocations
 		dist_index_.reserve(1024);
@@ -530,7 +532,7 @@ public:
 	typedef DistanceIndex<DistanceType> DistIndex;
 
 	KNNRadiusResultSet(DistanceType radius_, size_t capacity_) :
-        radius_(radius_), capacity_(capacity_)
+		radius_(radius_), ResultSet(capacity_)
     {
 		// reserving capacity to prevent memory re-allocations
 		dist_index_.reserve(capacity_);
@@ -637,7 +639,6 @@ public:
 private:
     bool is_heap_;
     DistanceType radius_;
-    size_t capacity_;
     DistanceType worst_dist_;
     std::vector<DistIndex> dist_index_;
 };
@@ -655,8 +656,8 @@ class CountRadiusResultSet : public ResultSet<DistanceType>
     size_t count;
 
 public:
-    CountRadiusResultSet(DistanceType radius_ ) :
-        radius(radius_)
+	CountRadiusResultSet(DistanceType radius_) :
+		radius(radius_), ResultSet(0)
     {
         clear();
     }
@@ -719,7 +720,7 @@ public:
     };
 
     /** Default cosntructor */
-    UniqueResultSet() :
+    UniqueResultSet() : ResultSet(0),
         worst_distance_(std::numeric_limits<DistanceType>::max())
     {
     }
@@ -832,7 +833,7 @@ protected:
     using UniqueResultSet<DistanceType>::dist_indices_;
 
     /** The number of neighbors to keep */
-    unsigned int capacity_;
+	size_t capacity_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -848,7 +849,7 @@ public:
      * @param capacity the number of neighbors to store at max
      */
     RadiusUniqueResultSet(DistanceType radius) :
-        radius_(radius)
+        radius_(radius), ResultSet(0)
     {
         is_full_ = true;
     }
