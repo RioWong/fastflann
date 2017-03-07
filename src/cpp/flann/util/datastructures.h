@@ -27,8 +27,8 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *************************************************************************/
 
-#ifndef HEAP_H_
-#define HEAP_H_
+#ifndef DATASTRUCTURES_H_
+#define DATASTRUCTURES_H_
 
 namespace flann
 {
@@ -239,4 +239,4 @@ public:
 
 }
 
-#endif HEAP_H_
+#endif /* DATASTRUCTURES_H_ */
