@@ -551,7 +551,7 @@ private:
         int i;
         BranchSt branch;
 		std::vector<DistanceType> dists(veclen_);
-		std::fill(dists.begin(), dists.end(), 0)
+		std::fill(dists.begin(), dists.end(), 0);
 
         int checkCount = 0;
 		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
@@ -641,7 +641,7 @@ private:
 		for (int i = 0; i < veclen_; i++) {
 			nodedist += dists[i];
 		}
-		if (nodedist*epsError < result_set.worstDist()) {
+		if ((nodedist*epsError < result_set.worstDist()) || !result_set.full()) {
 			heap->insert(BranchSt(otherChild, nodedist, dists));
 		}
 
@@ -705,7 +705,7 @@ private:
 		for (int i = 0; i < veclen_; i++) {
 			nodedist += dists[i];
 		}
-		if (nodedist*epsError < result_set.worstDist()) {
+		if ((nodedist*epsError < result_set.worstDist()) || !result_set.full()) {
 			heap->insert(BranchSt(otherChild, nodedist, dists));
 		}
 
