@@ -532,7 +532,11 @@ private:
             fprintf(stderr,"It doesn't make any sense to use more than one tree for exact search");
         }
         if (trees_>0) {
-            searchLevelExact<with_removed>(result, vec, tree_roots_[0], 0.0, epsError);
+			std::vector<ElementType> vecadd(veclen_);
+			for (int i = 0; i < veclen_; i++) {
+				vecadd[i] = vec[i];
+			}
+            searchLevelExact<with_removed>(result, vec, vecadd, tree_roots_[0], 0.0, epsError);
         }
     }
 
@@ -546,6 +550,8 @@ private:
     {
         int i;
         BranchSt branch;
+		std::vector<DistanceType> dists(veclen_);
+		std::fill(dists.begin(), dists.end(), 0)
 
         int checkCount = 0;
 		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
@@ -558,12 +564,12 @@ private:
 
 			/* Search once through each tree down to root. */
 			for (i = 0; i < trees_; ++i) {
-				searchLevel<with_removed>(result, vec, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
+				searchLevel<with_removed>(result, vec, dists, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
 			}
 
 			/* Keep searching other branches from heap until finished. */
 			while (heap->popMin(branch) && (checkCount < maxCheck || !result.full())) {
-				searchLevel<with_removed>(result, vec, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
+				searchLevel<with_removed>(result, vec, branch.dists, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
 			}
 
 			checked->~balancedTree();
@@ -573,12 +579,12 @@ private:
 
 			/* Search once through each tree down to root. */
 			for (i = 0; i < trees_; ++i) {
-				searchLevel<with_removed>(result, vec, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
+				searchLevel<with_removed>(result, vec, dists, tree_roots_[i], 0, checkCount, maxCheck, epsError, heap, checked);
 			}
 
 			/* Keep searching other branches from heap until finished. */
 			while (heap->popMin(branch) && (checkCount < maxCheck || !result.full())) {
-				searchLevel<with_removed>(result, vec, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
+				searchLevel<with_removed>(result, vec, branch.dists, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
 			}
 
 		}
@@ -591,7 +597,7 @@ private:
 	*  at least "mindistsq".
 	*/
 	template<bool with_removed>
-	void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
+	void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, std::vector<DistanceType> dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
 		float epsError, Heap<BranchSt>* heap, balancedTree<int>* checked) const
 	{
 		if (result_set.worstDist()<mindist) {
@@ -629,14 +635,24 @@ private:
 		adding exceeds their value.
 		*/
 
-		DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
-		//		if (2 * checkCount < maxCheck  ||  !result.full()) {
-		if ((new_distsq*epsError < result_set.worstDist()) || !result_set.full()) {
-			heap->insert(BranchSt(otherChild, new_distsq));
+		std::vector<DistanceType> dists = dists_;
+		dists[node->divfeat] = distance_.accum_dist(val, node->divval, node->divfeat);
+		DistanceType nodedist = 0;
+		for (int i = 0; i < veclen_; i++) {
+			nodedist += dists[i];
+		}
+		if (nodedist*epsError < result_set.worstDist()) {
+			heap->insert(BranchSt(otherChild, nodedist, dists));
 		}
 
+		//DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
+		////		if (2 * checkCount < maxCheck  ||  !result.full()) {
+		//if ((new_distsq*epsError < result_set.worstDist()) || !result_set.full()) {
+		//	heap->insert(BranchSt(otherChild, new_distsq));
+		//}
+
 		/* Call recursively to search next level down. */
-		searchLevel<with_removed>(result_set, vec, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
+		searchLevel<with_removed>(result_set, vec, dists_, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
 	}
 
     /**
@@ -645,7 +661,7 @@ private:
      *  at least "mindistsq".
      */
     template<bool with_removed>
-    void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
+    void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, std::vector<DistanceType> dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
                      float epsError, Heap<BranchSt>* heap, DynamicBitset& checked) const
     {
         if (result_set.worstDist()<mindist) {
@@ -683,21 +699,32 @@ private:
             adding exceeds their value.
          */
 
-        DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
-        //		if (2 * checkCount < maxCheck  ||  !result.full()) {
-        if ((new_distsq*epsError < result_set.worstDist())||  !result_set.full()) {
-            heap->insert( BranchSt(otherChild, new_distsq) );
-        }
+		std::vector<DistanceType> dists = dists_;
+		dists[node->divfeat] = distance_.accum_dist(val, node->divval, node->divfeat);
+		DistanceType nodedist = 0;
+		for (int i = 0; i < veclen_; i++) {
+			nodedist += dists[i];
+		}
+		if (nodedist*epsError < result_set.worstDist()) {
+			heap->insert(BranchSt(otherChild, nodedist, dists));
+		}
+
+        //DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
+        ////		if (2 * checkCount < maxCheck  ||  !result.full()) {
+        //if ((new_distsq*epsError < result_set.worstDist())||  !result_set.full()) {
+        //    heap->insert( BranchSt(otherChild, new_distsq) );
+        //}
 
         /* Call recursively to search next level down. */
-        searchLevel<with_removed>(result_set, vec, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
+        searchLevel<with_removed>(result_set, vec, dists_, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
     }
 
     /**
      * Performs an exact search in the tree starting from a node.
      */
     template<bool with_removed>
-    void searchLevelExact(ResultSet<DistanceType>& result_set, const ElementType* vec, const NodePtr node, DistanceType mindist, const float epsError) const
+    void searchLevelExact(ResultSet<DistanceType>& result_set, const ElementType* vec, std::vector<ElementType> vecadd,
+		const NodePtr node, DistanceType mindist, const float epsError) const
     {
         /* If this is a leaf node, then do check and return. */
         if ((node->child1 == NULL)&&(node->child2 == NULL)) {
@@ -725,16 +752,59 @@ private:
             adding exceeds their value.
          */
 
-        DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
+        DistanceType new_distsq = mindist + distance_.accum_dist(vecadd[node->divfeat], node->divval, node->divfeat);
 
         /* Call recursively to search next level down. */
         searchLevelExact<with_removed>(result_set, vec, bestChild, mindist, epsError);
 
-        if (mindist*epsError<=result_set.worstDist()) {
+        if (new_distsq*epsError<=result_set.worstDist()) {
+			vecadd[node->divfeat] = node->divval;
             searchLevelExact<with_removed>(result_set, vec, otherChild, new_distsq, epsError);
         }
     }
-    
+
+	/**
+	* Performs an exact search in the tree starting from a node.
+	*/
+	template<bool with_removed>
+	void searchLevelExact(ResultSet<DistanceType>& result_set, const ElementType* vec, const NodePtr node, DistanceType mindist, const float epsError) const
+	{
+		/* If this is a leaf node, then do check and return. */
+		if ((node->child1 == NULL) && (node->child2 == NULL)) {
+			int index = node->divfeat;
+			if (with_removed) {
+				if (removed_points_.test(index)) return; // ignore removed points
+			}
+			DistanceType dist = distance_(node->point, vec, veclen_);
+			result_set.addPoint(dist, index);
+
+			return;
+		}
+
+		/* Which child branch should be taken first? */
+		ElementType val = vec[node->divfeat];
+		DistanceType diff = val - node->divval;
+		NodePtr bestChild = (diff < 0) ? node->child1 : node->child2;
+		NodePtr otherChild = (diff < 0) ? node->child2 : node->child1;
+
+		/* Create a branch record for the branch not taken.  Add distance
+		of this feature boundary (we don't attempt to correct for any
+		use of this feature in a parent node, which is unlikely to
+		happen and would have only a small effect).  Don't bother
+		adding more branches to heap after halfway point, as cost of
+		adding exceeds their value.
+		*/
+
+		DistanceType new_distsq = mindist + distance_.accum_dist(val, node->divval, node->divfeat);
+
+		/* Call recursively to search next level down. */
+		searchLevelExact<with_removed>(result_set, vec, bestChild, mindist, epsError);
+
+		if (mindist*epsError <= result_set.worstDist()) {
+			searchLevelExact<with_removed>(result_set, vec, otherChild, new_distsq, epsError);
+		}
+	}
+
     void addPointToTree(NodePtr node, int ind)
     {
         ElementType* point = points_[ind];
