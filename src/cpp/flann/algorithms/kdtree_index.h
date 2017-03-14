@@ -572,7 +572,7 @@ private:
 				searchLevel<with_removed>(result, vec, branch.dists, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
 			}
 
-			checked->~balancedTree();
+			checked->clear();
 		}
 		else {
 			DynamicBitset checked(size_);
