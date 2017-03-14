@@ -550,13 +550,15 @@ private:
     {
         int i;
         BranchSt branch;
-		std::vector<DistanceType> dists(veclen_);
-		std::fill(dists.begin(), dists.end(), 0);
+		DistanceType* dists = new DistanceType[veclen_];
+		for (i = 0; i < veclen_; i++) {
+			dists[i] = 0;
+		}
 
         int checkCount = 0;
 		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
-		if (heapSize > std::pow(2, std::log((double)size_) / std::log((double)2))) {
-			heapSize = std::pow(2, std::log((double)size_) / std::log((double)2));
+		if (heapSize > size_) {
+			heapSize = size_;
 		}
 		Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize); //Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize);
 		if(result.capacity_ < size_/2) {
@@ -572,7 +574,7 @@ private:
 				searchLevel<with_removed>(result, vec, branch.dists, branch.node, branch.mindist, checkCount, maxCheck, epsError, heap, checked);
 			}
 
-			checked->clear();
+			delete checked;
 		}
 		else {
 			DynamicBitset checked(size_);
@@ -589,6 +591,7 @@ private:
 
 		}
         delete heap;
+		delete[] dists;
     }
 
 	/**
@@ -597,7 +600,7 @@ private:
 	*  at least "mindistsq".
 	*/
 	template<bool with_removed>
-	void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, std::vector<DistanceType> dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
+	void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, DistanceType* dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
 		float epsError, Heap<BranchSt>* heap, balancedTree<int>* checked) const
 	{
 		if (result_set.worstDist()<mindist) {
@@ -635,7 +638,10 @@ private:
 		adding exceeds their value.
 		*/
 
-		std::vector<DistanceType> dists = dists_;
+		DistanceType* dists = new DistanceType[veclen_];
+		for (int i = 0; i < veclen_; i++) {
+			dists[i] = dists_[i];
+		}
 		dists[node->divfeat] = distance_.accum_dist(val, node->divval, node->divfeat);
 		DistanceType nodedist = 0;
 		for (int i = 0; i < veclen_; i++) {
@@ -653,6 +659,7 @@ private:
 
 		/* Call recursively to search next level down. */
 		searchLevel<with_removed>(result_set, vec, dists_, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
+		delete[] dists;
 	}
 
     /**
@@ -661,7 +668,7 @@ private:
      *  at least "mindistsq".
      */
     template<bool with_removed>
-    void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, std::vector<DistanceType> dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
+    void searchLevel(ResultSet<DistanceType>& result_set, const ElementType* vec, DistanceType* dists_, NodePtr node, DistanceType mindist, int& checkCount, int maxCheck,
                      float epsError, Heap<BranchSt>* heap, DynamicBitset& checked) const
     {
         if (result_set.worstDist()<mindist) {
@@ -699,7 +706,10 @@ private:
             adding exceeds their value.
          */
 
-		std::vector<DistanceType> dists = dists_;
+		DistanceType* dists = new DistanceType[veclen_];
+		for (int i = 0; i < veclen_; i++) {
+			dists[i] = dists_[i];
+		}
 		dists[node->divfeat] = distance_.accum_dist(val, node->divval, node->divfeat);
 		DistanceType nodedist = 0;
 		for (int i = 0; i < veclen_; i++) {
@@ -717,6 +727,7 @@ private:
 
         /* Call recursively to search next level down. */
         searchLevel<with_removed>(result_set, vec, dists_, bestChild, mindist, checkCount, maxCheck, epsError, heap, checked);
+		delete[] dists;
     }
 
     /**

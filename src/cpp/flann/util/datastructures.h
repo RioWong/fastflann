@@ -81,17 +81,8 @@ public:
 	*/
 	~balancedTree(void) 
 	{
-	}
-
-	/**
-		Delete the structure
-	*/
-	void clear()
-	{
-		if (nodel) { nodel->clear(); }
-		if (noder) { noder->clear(); }
-
-		delete this;
+		if (nodel) { nodel->~balancedTree(); }
+		if (noder) { noder->~balancedTree(); }
 	}
 
 	/**

@@ -51,11 +51,11 @@ struct BranchStruct
 {
     T node;           /* Tree node at which search resumes */
     DistanceType mindist;     /* Minimum distance to query for all nodes below. */
-	std::vector<DistanceType> dists;
+	DistanceType* dists;
 
     BranchStruct() {}
     BranchStruct(const T& aNode, DistanceType dist) : node(aNode), mindist(dist) {}
-	BranchStruct(const T& aNode, DistanceType dist, std::vector<DistanceType> dists_) 
+	BranchStruct(const T& aNode, DistanceType dist, DistanceType* dists_)
 		: node(aNode), mindist(dist), dists(dists_) {}
 
     bool operator<(const BranchStruct<T, DistanceType>& rhs) const
