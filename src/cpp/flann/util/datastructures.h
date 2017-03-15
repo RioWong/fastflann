@@ -53,7 +53,7 @@ public:
 	/**
 		Every node has a pointer to each child and a pointer to the parent
 	*/
-	balancedTree* parent;
+	balancedTree<T>* parent;
 	balancedTree<T>* nodel;
 	balancedTree<T>* noder;
 
@@ -76,21 +76,13 @@ public:
 		noder = NULL;
 	}
 
-
 	/**
 	Deconstructor
 	*/
-	~BalancedTree(void)
+	~balancedTree(void)
 	{
-	}
-
-	/**
-	Clear Tree
-	*/
-	void clear()
-	{
-		if (nodel != NULL) { nodel->clear(); delete nodel; }
-		if (noder != NULL) { noder->clear(); delete noder; }
+		if (nodel != NULL) { nodel->~balancedTree(); delete nodel; nodel = NULL; }
+		if (noder != NULL) { noder->~balancedTree(); delete noder; noder = NULL; }
 	}
 
 	/**
