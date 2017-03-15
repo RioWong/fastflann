@@ -570,7 +570,7 @@ private:
 				findNN<with_removed>(node, result, vec, checks, maxChecks, heap, checked);
 			}
 
-			checked->~balancedTree();
+			checked->clear();
 		}
 		else {
 			DynamicBitset checked(size_);

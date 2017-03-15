@@ -76,13 +76,21 @@ public:
 		noder = NULL;
 	}
 
+
 	/**
-		Deconstructor
+	Deconstructor
 	*/
-	~balancedTree(void) 
+	~BalancedTree(void)
 	{
-		if (nodel) { nodel->~balancedTree(); }
-		if (noder) { noder->~balancedTree(); }
+	}
+
+	/**
+	Clear Tree
+	*/
+	void clear()
+	{
+		if (nodel != NULL) { nodel->clear(); delete nodel; }
+		if (noder != NULL) { noder->clear(); delete noder; }
 	}
 
 	/**
