@@ -31,246 +31,443 @@
 #define DATASTRUCTURES_H_
 
 namespace flann
+
 {
 
-template <typename T> 
-class balancedTree 
-{
-public:
+	template <typename T>
+	class BalancedTree
+	{
+	public:
 
-	/**
+		/**
 		Every node stores a value. When the node stores a value which is different from NAN
 		occupied becomes true
-	*/
-	T value;
-	bool occupied;
+		*/
+		T value;
+		bool occupied;
 
-	/**
+		/**
 		Depth is the maximal depth that a child from this node has
-	*/
-	int depth;
+		*/
+		int depth;
 
-	/**
+		/**
 		Every node has a pointer to each child and a pointer to the parent
-	*/
-	balancedTree<T>* parent;
-	balancedTree<T>* nodel;
-	balancedTree<T>* noder;
+		*/
+		BalancedTree<T>* parent;
+		BalancedTree<T>* nodel;
+		BalancedTree<T>* noder;
 
-
-	/**
+		/**
 		Constructor
-		
+
 		@param pointer to the parent of this node
-	*/
-	balancedTree(balancedTree<T>* parent_) 
-	{
-		value = NAN;
-		depth = 0;
+		*/
+		BalancedTree(BalancedTree<T>* parent_) : parent(parent_)
+		{
+			value = NAN;
 
-		occupied = 0;
+			occupied = 0;
+			depth = 0;
 
-		parent = parent_;
+			nodel = NULL;
+			noder = NULL;
+		}
 
-		nodel = NULL;
-		noder = NULL;
-	}
+		/**
+		Deconstructor
+		*/
+		~BalancedTree(void)
+		{
+			if (nodel != NULL) { nodel->~BalancedTree(); delete nodel; nodel = NULL; }
+			if (noder != NULL) { noder->~BalancedTree(); delete noder; noder = NULL; }
+		}
 
-	/**
-	Deconstructor
-	*/
-	~balancedTree(void)
-	{
-		if (nodel != NULL) { nodel->~balancedTree(); delete nodel; nodel = NULL; }
-		if (noder != NULL) { noder->~balancedTree(); delete noder; noder = NULL; }
-	}
-
-	/**
+		/**
 		Adds a value to the tree
 
-		@param node_ the value which should be added
-		@return true when operation was successful
-	*/
-	bool addNode(T node_)
-	{
-		int success = 0;
+		@param root_, pointer to root
+		@param value_, the value which should be added
+		*/
+		bool addNode(void** root_, T value_)
+		{
+			/**
+			Call addNode() when the respective node exits, otherwise create a node and define the values
+			*/
+			if (!occupied) {
+				value = value_;
+				occupied = 1;
+				return 1;
+			}
+			else if (value > value_) {
+				if (!nodel) {
+					nodel = new BalancedTree<T>(this);
+					nodel->value = value_;
+					nodel->occupied = 1;
+				}
+				else {
+					nodel->addNode(root_, value_);
+				}
+			}
+			else if (value < value_) {
+				if (!noder) {
+					noder = new BalancedTree<T>(this);
+					noder->value = value_;
+					noder->occupied = 1;
+				}
+				else {
+					noder->addNode(root_, value_);
+				}
+			}
+			else {
+				return 0;
+			}
+			/**
+			Compute the possibly changed depth and the balancefactor. Rotate the tree if the balancefactor is greater or equal than 2
+			*/
+			setDepthNode();
 
-		if ( !occupied ) {
-			value = node_;
-			occupied = 1;
+			int balanceFactor = getBalanceFactor();
+
+			if (balanceFactor == 2) {
+				bool rootparent = 0;
+				if (!parent) {
+					rootparent = 1;
+					*root_ = nodel;
+				}
+				turnRight(root_, rootparent);
+				parent->setDepth();
+			}
+			else if (balanceFactor == -2) {
+				bool rootparent = 0;
+				if (!parent) {
+					rootparent = 1;
+					*root_ = noder;
+				}
+				turnLeft(root_, rootparent);
+				parent->setDepth();
+			}
+		}
+
+		/**
+		Rotates the node to the right
+
+		@param root_, pointer to root
+		@param rootparent_, determines whether the node is involved which points to root
+		*/
+		void turnRight(void** root_, bool rootparent_) {
+			/**
+			When the right subtree of the left node has a too large depth the left subtree has to turn left
+			*/
+			int depthl = 0, depthr = 0;
+			if (nodel->noder) { depthr = nodel->noder->depth + 1; }
+			if (nodel->nodel) { depthl = nodel->nodel->depth + 1; }
+			if (depthr > depthl) {
+				if (rootparent_) {
+					*root_ = nodel->noder;
+				}
+				nodel->turnLeft(root_, rootparent_);
+			}
+			/**
+			Assigning the respective left or right node in the parent the new child
+			*/
+			if (parent) {
+				if (!parent->nodel && parent->noder) {
+					parent->noder = nodel;
+				}
+				else if (parent->nodel && !parent->noder) {
+					parent->nodel = nodel;
+				}
+				else if (parent->nodel && parent->noder) {
+					if (parent->nodel->value == value) { parent->nodel = nodel; }
+					else if (parent->noder->value == value) { parent->noder = nodel; }
+				}
+			}
+			/**
+			Exchange the respective pointers of the involved nodes using the node swap
+			*/
+			BalancedTree<T>* swap = nodel;
+			swap->parent = parent;
+			nodel = nodel->noder;
+			if (nodel) {
+				nodel->parent = this;
+			}
+			parent = swap;
+			swap->noder = this;
+		}
+
+		/**
+		Rotates the node to the left
+
+		@param root_, pointer to root
+		@param rootparent_, determines whether the node is involved which points to root
+		*/
+		void turnLeft(void** root_, bool rootparent_) {
+			/**
+			When the left subtree of the right node has a too large depth the right subtree has to turn right
+			*/
+			int depthl = 0, depthr = 0;
+			if (noder->nodel) { depthl = noder->nodel->depth + 1; }
+			if (noder->noder) { depthr = noder->noder->depth + 1; }
+			if (depthl > depthr) {
+				if (rootparent_) {
+					*root_ = noder->nodel;
+				}
+				noder->turnRight(root_, rootparent_);
+			}
+			/**
+			Assigning the respective left or right node in the parent the new child
+			*/
+			if (parent) {
+				if (!parent->nodel && parent->noder) {
+					parent->noder = noder;
+				}
+				else if (parent->nodel && !parent->noder) {
+					parent->nodel = noder;
+				}
+				else if (parent->nodel && parent->noder) {
+					if (parent->nodel->value == value) { parent->nodel = noder; }
+					else if (parent->noder->value == value) { parent->noder = noder; }
+				}
+			}
+			/**
+			Exchange the respective pointers of the involved nodes using the node swap
+			*/
+			BalancedTree<T>* swap = noder;
+			swap->parent = parent;
+			noder = noder->nodel;
+			if (noder) {
+				noder->parent = this;
+			}
+			parent = swap;
+			swap->nodel = this;
+
+		}
+
+		/**
+		Computes the balance factor
+
+		@return balancefactor which lies between [-2,2]
+		*/
+		int getBalanceFactor() {
+			if (!nodel && !noder) {
+				return 0;
+			}
+			else if (!nodel) {
+				return -noder->depth - 1;
+			}
+			else if (!noder) {
+				return nodel->depth + 1;
+			}
+			else {
+				return nodel->depth - noder->depth;
+			}
+		}
+
+	public:
+
+		/**
+		Computes the number of elements in the tree
+
+		@return count number of elements in the tree
+		*/
+		void getNumber(int& count)
+		{
+			if (nodel) { nodel->getNumber(count); }
+			if (noder) { noder->getNumber(count); }
+
+			count = count + 1;
+		}
+
+		/**
+		Displays information about ervery node of the tree
+
+		Balancefactor - Depth - Value - Nodel->Value - Noder->Value
+		*/
+		void getInfos()
+		{
+			if (nodel) { nodel->getInfos(); }
+			if (noder) { noder->getInfos(); }
+
+			if (!nodel && !noder) {
+				std::cout << 0 << " " << depth << " " << value << " " << "0" << " " << "0" << " ";
+
+			}
+			else if (!nodel && noder) {
+				std::cout << -noder->depth - 1 << " " << depth << " " << value << " " << "0" << " " << noder->value << " ";
+			}
+			else if (nodel && !noder) {
+				std::cout << nodel->depth + 1 << " " << depth << " " << value << " " << nodel->value << " " << "0" << " ";
+			}
+			else {
+				std::cout << nodel->depth - noder->depth << " " << depth << " " << value << " " << nodel->value << " " << noder->value << " ";
+			}
+
+			if (parent) {
+				std::cout << parent->value << " " << std::endl;
+			}
+			else
+				std::cout << "0" << std::endl;
+		}
+
+		/**
+		Checks whether the specification of the depth in every node of the tree is correct
+
+		@return true when the specifications are correct
+		*/
+		bool checkDepth()
+		{
+			if (nodel) {
+				if (!nodel->checkDepth()) {
+					return 0;
+				}
+			}
+			if (noder) {
+				if (!noder->checkDepth()) {
+					return 0;
+				}
+			}
+
+			if (!nodel && !noder) {
+				if (depth != 0) {
+					return 0;
+				}
+			}
+			else if (!nodel) {
+				if (depth != noder->depth + 1) {
+					return 0;
+				}
+			}
+			else if (!noder) {
+				if (depth != nodel->depth + 1) {
+					return 0;
+				}
+			}
+			else {
+				if (depth != (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1) {
+					return 0;
+				}
+			}
 
 			return 1;
 		}
-		else if (value > node_) {
-			if (!nodel) {
-				nodel = new balancedTree<T>(this);
-			}
-			
-			success = nodel->addNode(node_);
 
-			// Computation of the depth
-			if (noder) {
-				depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
-			}
-		
-			else {
-				depth = nodel->depth + 1;
-			}
-		}
-		else if (value < node_) {
-			if (!noder) {
-				noder = new balancedTree<T>(this);
-			}
-			
-			success = noder->addNode(node_);
+		/**
+		Checks whether the left and right node have this as parent
 
-			// Computation of the depth
+		@return true when the the left and right node have this as parent
+		*/
+		bool checkParent()
+		{
 			if (nodel) {
-				depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
+				if (nodel->parent->value == value) {
+					return nodel->checkParent();
+				}
+				else {
+					return 0;
+				}
+			}
+			if (noder) {
+				if (noder->parent->value == value) {
+					return noder->checkParent();
+				}
+				else {
+					return 0;
+				}
 			}
 
-			else {
+			return 1;
+		}
+
+		/**
+		Checks whether the value of the left node is smaller and the value of the right value is bigger than the value of the parent
+
+		@return true when the values are co
+		*/
+		bool checkRelations()
+		{
+			if (nodel) {
+				if (nodel->value > value) {
+					return 0;
+				}
+				else {
+					return nodel->checkRelations();
+				}
+			}
+			if (noder) {
+				if (noder->value < value) {
+					return 0;
+				}
+				else {
+					return noder->checkRelations();
+				}
+			}
+
+			return 1;
+		}
+
+	private:
+
+		/**
+		Sets the depth of all children of a node
+		*/
+		void setDepth()
+		{
+			if (nodel) { nodel->setDepth(); }
+			if (noder) { noder->setDepth(); }
+
+			if (!nodel && !noder) {
+				depth = 0;
+			}
+			else if (!nodel) {
 				depth = noder->depth + 1;
 			}
-		}
-		else {
-			return 0;
-		}
-
-		if (success) {
-			// Computation whether the tree is balanced after adding the value
-			int balancefactor = 0;
-			if (!nodel && noder) {
-				balancefactor = -noder->depth - 1;
+			else if (!noder) {
+				depth = nodel->depth + 1;
 			}
-			else if (nodel && !noder) {
-				balancefactor = nodel->depth + 1;
+			else {
+				depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
 			}
-			else if (nodel && noder) {
-				balancefactor = nodel->depth - noder->depth;
+		}
+
+		/**
+		Sets the depth of a node
+		*/
+		void setDepthNode()
+		{
+			if (!nodel && !noder) {
+				depth = 0;
 			}
-
-			//Balancing the tree
-			balance(balancefactor);
-		}
-
-		return success;
-	}
-
-	/**
-		Adds a value to the tree
-
-		@param balancefactor this factor determines whether the tree should be balanced
-	*/
-	void balance(int balancefactor_)
-	{
-		if (balancefactor_ == 2) {
-			
-			if (nodel->noder) {
-				nodel->balance(-2);
+			else if (!nodel) {
+				depth = noder->depth + 1;
 			}
-			
-			if (parent) {
-				if (parent->nodel == this) {
-					parent->nodel = nodel;
-				}
-				else {
-					parent->noder = nodel;
-				}
+			else if (!noder) {
+				depth = nodel->depth + 1;
 			}
-			nodel->parent = parent;
-			parent = nodel;
-			nodel = NULL;
-			
-			parent->noder = this;
-
-			parent->setDepth();
-		}
-		else if (balancefactor_ == -2) {
-
-			if (noder->nodel) {
-				noder->balance(2);
+			else {
+				depth = (nodel->depth>noder->depth ? nodel->depth : noder->depth) + 1;
 			}
+		}
 
-			if (parent) {
-				if (parent->nodel == this) {
-					parent->nodel = noder;
-				}
-				else {
-					parent->noder = noder;
-				}
-			}
-			noder->parent = parent;
-			parent = noder;
-			noder = NULL;
+	public:
 
-			parent->nodel = this;
-
-			parent->setDepth();
-		}
-	}
-
-	/**
-		Displays some information about ervery node of the tree
-	*/
-	void getInfos()
-	{
-		if (nodel) { nodel->getInfos(); }
-		if (noder) { noder->getInfos(); }
-
-		if (!nodel && !noder) {
-			std::cout << 0 << " " << depth << " " << value << std::endl;
-		}
-		else if (!nodel && noder) {
-			std::cout << -noder->depth - 1 << " " << depth << " " << value << std::endl;
-		}
-		else if (nodel && !noder) {
-			std::cout << nodel->depth + 1 << " " << depth << " " << value << std::endl;
-		}
-		else {
-			std::cout << nodel->depth - noder->depth << " " << depth << " " << value << std::endl;
-		}
-	}
-
-	/**
-		Computes and sets the depth of every node and
-	*/
-	void setDepth()
-	{
-		if (nodel) { nodel->setDepth(); }
-		if (noder) { noder->setDepth(); }
-
-		if (!nodel && !noder) {
-			depth = 0;
-		}
-		else if (!nodel) {
-			depth = noder->depth + 1;
-		}
-		else if (!noder) {
-			depth = nodel->depth + 1;
-		}
-		else {
-			depth = (nodel->depth > noder->depth ? nodel->depth : noder->depth) + 1;
-		}
-	}
-	
-	/**
+		/**
 		Searches for a node with the same value as value_
 
 		@param value_ value which should be searched for in the tree
 		@return true when the tree contains a node with the given value
-	*/
-	bool search(size_t value_)
-	{
-		if (value_ == value) { return 1; }
+		*/
+		bool search(T value_)
+		{
 
-		if (value_ < value && nodel) { return nodel->search(value_); }
-		if (value_ > value && noder) { return noder->search(value_); }
+			if (value_ == value) { return 1; }
 
-		return 0;
-	}
-};
+			if (value_ < value && nodel) { return nodel->search(value_); }
+			if (value_ > value && noder) { return noder->search(value_); }
 
+			return 0;
+		}
+	};
 }
 
 #endif /* DATASTRUCTURES_H_ */

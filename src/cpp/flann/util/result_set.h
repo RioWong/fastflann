@@ -46,22 +46,25 @@ namespace flann
     point, as well as the node at which the search resumes.
  */
 
+
 template <typename T, typename DistanceType>
 struct BranchStruct
 {
-    T node;           /* Tree node at which search resumes */
-    DistanceType mindist;     /* Minimum distance to query for all nodes below. */
+	T node;           /* Tree node at which search resumes */
+	DistanceType mindist;     /* Minimum distance to query for all nodes below. */
 	DistanceType* dists;
 
-    BranchStruct() {}
-    BranchStruct(const T& aNode, DistanceType dist) : node(aNode), mindist(dist) {}
+	BranchStruct() {}
+	BranchStruct(const T& aNode, DistanceType dist) : node(aNode), mindist(dist) {}
 	BranchStruct(const T& aNode, DistanceType dist, DistanceType* dists_)
 		: node(aNode), mindist(dist), dists(dists_) {}
 
-    bool operator<(const BranchStruct<T, DistanceType>& rhs) const
-    {
-        return mindist<rhs.mindist;
-    }
+	void clear() { delete[] dists; }
+
+	bool operator<(const BranchStruct<T, DistanceType>& rhs) const
+	{
+		return mindist<rhs.mindist;
+	}
 };
 
 

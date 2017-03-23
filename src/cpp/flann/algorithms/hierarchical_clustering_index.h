@@ -544,33 +544,33 @@ private:
     }
 
 
-    template<bool with_removed>
-    void findNeighborsWithRemoved(ResultSet<DistanceType>& result, const ElementType* vec, const SearchParams& searchParams) const
-    {
-        int maxChecks = searchParams.checks;
+	template<bool with_removed>
+	void findNeighborsWithRemoved(ResultSet<DistanceType>& result, const ElementType* vec, const SearchParams& searchParams) const
+	{
+		int maxChecks = searchParams.checks;
 
-        // Priority queue storing intermediate branches in the best-bin-first search
+		// Priority queue storing intermediate branches in the best-bin-first search
 		int heapSize = (int)(result.capacity_*std::log((double)size_) / std::log((double)2));
 		if (heapSize > std::pow(2, std::log((double)size_) / std::log((double)2))) {
 			heapSize = std::pow(2, std::log((double)size_) / std::log((double)2));
 		}
 		Heap<BranchSt>* heap = new Heap<BranchSt>(heapSize); //Heap<BranchSt>* heap = new Heap<BranchSt>(size_);
-		
-		if (result.capacity_ < size_ / 2) {
-			balancedTree<int>* checked(new balancedTree<int>(NULL));
+
+		if (result.capacity_ < size_ / 8) {
+			BalancedTree<int>* checked(new BalancedTree<int>(NULL));
 
 			int checks = 0;
 			for (int i = 0; i < trees_; ++i) {
-				findNN<with_removed>(tree_roots_[i], result, vec, checks, maxChecks, heap, checked);
+				findNN<with_removed>(tree_roots_[i], result, vec, checks, maxChecks, heap, &checked);
 			}
 
 			BranchSt branch;
 			while (heap->popMin(branch) && (checks < maxChecks || !result.full())) {
 				NodePtr node = branch.node;
-				findNN<with_removed>(node, result, vec, checks, maxChecks, heap, checked);
+				findNN<with_removed>(node, result, vec, checks, maxChecks, heap, &checked);
 			}
 
-			checked->~balancedTree();
+			checked->~BalancedTree<int>();
 		}
 		else {
 			DynamicBitset checked(size_);
@@ -587,8 +587,8 @@ private:
 			}
 
 		}
-        delete heap;
-    }
+		delete heap;
+	}
 
 	/**
 	* Performs one descent in the hierarchical k-means tree. The branches not
@@ -604,7 +604,7 @@ private:
 
 	template<bool with_removed>
 	void findNN(NodePtr node, ResultSet<DistanceType>& result, const ElementType* vec, int& checks, int maxChecks,
-		Heap<BranchSt>* heap, balancedTree<int>* checked) const
+		Heap<BranchSt>* heap, BalancedTree<int>** checked) const
 	{
 		if (node->childs.empty()) {
 			if (checks >= maxChecks) {
@@ -616,10 +616,10 @@ private:
 				if (with_removed) {
 					if (removed_points_.test(pointInfo.index)) continue;
 				}
-				if (checked->search(pointInfo.index)) continue;
+				if ((*checked)->search(pointInfo.index)) continue;
 				DistanceType dist = distance_(pointInfo.point, vec, veclen_);
 				result.addPoint(dist, pointInfo.index);
-				checked->addNode(pointInfo.index);
+				(*checked)->addNode((void**)checked, pointInfo.index);
 				++checks;
 			}
 		}
